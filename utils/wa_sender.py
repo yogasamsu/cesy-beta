@@ -1,40 +1,53 @@
 import requests
 import os
-import time
-import random
+import json
 
-# Load token dari environment variable
-TOKEN = os.getenv("META_TOKEN")
-PHONE_ID = os.getenv("PHONE_ID")
-
-def send_message(phone, name, template_text):
+def send_template_to_meta(phone, template_name, parameters=None):
     """
-    phone: 6281xxxx
-    name: Fulan
-    template_text: "Halo {Name}, apa kabar?"
+    Mengirim Template Message (Wajib untuk inisiasi chat).
+    parameters: list of strings (misal ['Budi', '80']) untuk {{1}}, {{2}}
     """
+    token = os.getenv("META_TOKEN")
+    phone_id = os.getenv("PHONE_NUMBER_ID")
+    version = os.getenv("API_VERSION", "v17.0")
     
-    # 1. Replace variable
-    final_message = template_text.replace("{Name}", name)
+    url = f"https://graph.facebook.com/{version}/{phone_id}/messages"
     
-    # 2. Prepare Payload Meta
-    url = f"https://graph.facebook.com/v17.0/{PHONE_ID}/messages"
     headers = {
-        "Authorization": f"Bearer {TOKEN}",
+        "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
-    data = {
+    
+    # Construct Components (Variables)
+    components = []
+    if parameters:
+        body_params = []
+        for param in parameters:
+            body_params.append({
+                "type": "text",
+                "text": str(param)
+            })
+        
+        components.append({
+            "type": "body",
+            "parameters": body_params
+        })
+
+    payload = {
         "messaging_product": "whatsapp",
         "to": phone,
-        "type": "text",
-        "text": {"body": final_message}
+        "type": "template",
+        "template": {
+            "name": template_name,
+            "language": {"code": "id"}, # Sesuaikan dengan setting di Meta (id/en_US)
+            "components": components
+        }
     }
     
-    # 3. Send Request
     try:
-        response = requests.post(url, headers=headers, json=data)
+        response = requests.post(url, headers=headers, json=payload)
         if response.status_code == 200:
-            return True, "Sent"
+            return True, response.json()
         else:
             return False, response.text
     except Exception as e:
